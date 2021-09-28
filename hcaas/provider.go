@@ -26,7 +26,9 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"hcaas_url": resourceHcaasURL(),
+			"hcaas_url":     resourceHcaasURL(),
+			"hcaas_watcher": resourceHcaasWatcher(),
+			"hcaas_group":   resourceHcaasGroup(),
 		},
 	}
 
