@@ -32,10 +32,11 @@ uninstall:
 	rm -Rf ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}
 
 test:
-	TF_ACC=1 TF_ACC_TERRAFORM_VERSION=1.0.3 go test ./... -v
+	TF_ACC=1 TF_ACC_TERRAFORM_VERSION=1.3.2 go test ./... -v
 
 debug_test:
 	TF_LOG=debug make test
 
 generate-docs:
+	go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@0.13.0
 	go generate
