@@ -38,4 +38,5 @@ debug_test:
 	TF_LOG=debug make test
 
 generate-docs:
+	go get github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 	go generate
