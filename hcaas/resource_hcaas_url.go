@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -80,20 +84,33 @@ func resourceHcaasURLCreate(ctx context.Context, d *schema.ResourceData, meta in
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate)-time.Minute, func() *retry.RetryError {
+		resp, err := http.DefaultClient.Do(req)
+
+		if err != nil {
+			if strings.Contains(err.Error(), "event locked") {
+				return retry.RetryableError(err)
+			}
+			return retry.NonRetryableError(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		if resp.StatusCode >= http.StatusInternalServerError && strings.Contains(string(body), "event locked") {
+			return retry.RetryableError(err)
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			return retry.NonRetryableError(fmt.Errorf("bad status code: %d, body: %q", resp.StatusCode, string(body)))
+		}
+		return nil
+	})
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
-	}
-
 	d.SetId(r.URL)
-
 	return nil
 }
 
@@ -162,16 +179,30 @@ func resourceHcaasURLDelete(ctx context.Context, d *schema.ResourceData, meta in
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate)-time.Minute, func() *retry.RetryError {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			if strings.Contains(err.Error(), "event locked") {
+				return retry.RetryableError(err)
+			}
+			return retry.NonRetryableError(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		if resp.StatusCode >= http.StatusInternalServerError && strings.Contains(string(body), "event locked") {
+			return retry.RetryableError(err)
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			return retry.NonRetryableError(fmt.Errorf("bad status code: %d, body: %q", resp.StatusCode, string(body)))
+		}
+		return nil
+	})
+
 	if err != nil {
 		return diag.FromErr(err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
 	}
 	return nil
 }
