@@ -4,14 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -70,28 +66,7 @@ func resourceHcaasGroupCreate(ctx context.Context, d *schema.ResourceData, meta 
 
 	req.Header.Set("Authorization", provider.Token)
 
-	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate)-time.Minute, func() *retry.RetryError {
-		resp, err := http.DefaultClient.Do(req)
-
-		if err != nil {
-			if strings.Contains(err.Error(), "event locked") {
-				return retry.RetryableError(err)
-			}
-			return retry.NonRetryableError(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		if resp.StatusCode >= http.StatusInternalServerError && strings.Contains(string(body), "event locked") {
-			return retry.RetryableError(err)
-		}
-
-		if resp.StatusCode >= http.StatusBadRequest {
-			return retry.NonRetryableError(fmt.Errorf("bad status code: %d, body: %q", resp.StatusCode, string(body)))
-		}
-		return nil
-	})
+	err = retryRequestOnEventLock(ctx, d, req)
 
 	if err != nil {
 		return diag.FromErr(err)
@@ -163,28 +138,7 @@ func resourceHcaasGroupDelete(ctx context.Context, d *schema.ResourceData, meta 
 
 	req.Header.Set("Authorization", provider.Token)
 
-	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate)-time.Minute, func() *retry.RetryError {
-		resp, err := http.DefaultClient.Do(req)
-
-		if err != nil {
-			if strings.Contains(err.Error(), "event locked") {
-				return retry.RetryableError(err)
-			}
-			return retry.NonRetryableError(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		if resp.StatusCode >= http.StatusInternalServerError && strings.Contains(string(body), "event locked") {
-			return retry.RetryableError(err)
-		}
-
-		if resp.StatusCode >= http.StatusBadRequest {
-			return retry.NonRetryableError(fmt.Errorf("bad status code: %d, body: %q", resp.StatusCode, string(body)))
-		}
-		return nil
-	})
+	err = retryRequestOnEventLock(ctx, d, req)
 
 	if err != nil {
 		return diag.FromErr(err)

@@ -3,10 +3,14 @@ package hcaas
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	tsuruCmd "github.com/tsuru/tsuru/cmd"
 )
@@ -72,4 +76,30 @@ func (h *hcaasProvider) serviceURL(serviceName, instance, path string) string {
 	q := url.Values{}
 	q.Set("callback", fmt.Sprintf("/resources/%s/%s", instance, strings.TrimLeft(path, "/")))
 	return fmt.Sprintf("%s/services/%s/proxy/%s?%s", h.Host, serviceName, instance, q.Encode())
+}
+
+// retryRequestOnEventLock will retry the same request if the response is a 5xx containing a "event locked" in the response
+func retryRequestOnEventLock(ctx context.Context, d *schema.ResourceData, req *http.Request) error {
+	return retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate)-time.Minute, func() *retry.RetryError {
+		resp, err := http.DefaultClient.Do(req)
+
+		if err != nil {
+			if strings.Contains(err.Error(), "event locked") {
+				return retry.RetryableError(err)
+			}
+			return retry.NonRetryableError(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		if resp.StatusCode >= http.StatusInternalServerError && strings.Contains(string(body), "event locked") {
+			return retry.RetryableError(err)
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			return retry.NonRetryableError(fmt.Errorf("bad status code: %d, body: %q", resp.StatusCode, string(body)))
+		}
+		return nil
+	})
 }
