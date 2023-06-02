@@ -74,20 +74,12 @@ func resourceHcaasWatcherCreate(ctx context.Context, d *schema.ResourceData, met
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
-	}
-
 	d.SetId(r.Watcher)
-
 	return nil
 }
 
@@ -144,17 +136,12 @@ func resourceHcaasWatcherDelete(ctx context.Context, d *schema.ResourceData, met
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
-	}
 	return nil
 }
 

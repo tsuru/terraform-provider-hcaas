@@ -80,20 +80,12 @@ func resourceHcaasURLCreate(ctx context.Context, d *schema.ResourceData, meta in
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
-	}
-
 	d.SetId(r.URL)
-
 	return nil
 }
 
@@ -162,16 +154,10 @@ func resourceHcaasURLDelete(ctx context.Context, d *schema.ResourceData, meta in
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
 	}
 	return nil
 }

@@ -66,21 +66,14 @@ func resourceHcaasGroupCreate(ctx context.Context, d *schema.ResourceData, meta 
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
-	}
-
 	d.SetId(r.Group)
-
 	return nil
+
 }
 
 func resourceHcaasGroupRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -145,16 +138,10 @@ func resourceHcaasGroupDelete(ctx context.Context, d *schema.ResourceData, meta 
 
 	req.Header.Set("Authorization", provider.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	err = retryRequestOnEventLock(ctx, d, req)
+
 	if err != nil {
 		return diag.FromErr(err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return diag.Errorf("Bad status code: %d, body: %q", resp.StatusCode, string(body))
 	}
 	return nil
 }
