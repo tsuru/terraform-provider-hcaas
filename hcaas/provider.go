@@ -12,7 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	tsuruCmd "github.com/tsuru/tsuru/cmd"
+	tsuruclient "github.com/tsuru/go-tsuruclient/pkg/client"
+	"github.com/tsuru/go-tsuruclient/pkg/config"
 )
 
 func Provider() *schema.Provider {
@@ -53,7 +54,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData, terraformVer
 	p.Host = d.Get("host").(string)
 
 	if p.Host == "" {
-		target, err := tsuruCmd.GetTarget()
+		target, err := config.GetTarget()
 		if err != nil {
 			return nil, diag.FromErr(err)
 		}
@@ -62,7 +63,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData, terraformVer
 
 	p.Token = d.Get("token").(string)
 	if p.Token == "" {
-		token, err := tsuruCmd.ReadToken()
+		token, err := readToken()
 		if err != nil {
 			return nil, diag.FromErr(err)
 		}
@@ -102,4 +103,12 @@ func retryRequestOnEventLock(ctx context.Context, d *schema.ResourceData, req *h
 		}
 		return nil
 	})
+}
+
+func readToken() (string, error) {
+	_, tokenProvider, err := tsuruclient.RoundTripperAndTokenProvider()
+	if err != nil {
+		return "", err
+	}
+	return tokenProvider.Token()
 }
